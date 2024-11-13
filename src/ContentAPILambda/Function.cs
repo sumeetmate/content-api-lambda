@@ -6,6 +6,7 @@ using System.Text.Json;
 
 using Amazon.Lambda.Core;
 using Amazon.Lambda.APIGatewayEvents;
+using System.Net.Http.Json;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -16,32 +17,45 @@ public class Function
 {
 
     private static readonly HttpClient client = new HttpClient();
-
-    private static async Task<string> GetCallingIP()
+    private static async Task<List<Post>> GetPost()
     {
-        client.DefaultRequestHeaders.Accept.Clear();
-        client.DefaultRequestHeaders.Add("User-Agent", "AWS Lambda .Net Client");
-
-        var msg = await client.GetStringAsync("http://checkip.amazonaws.com/").ConfigureAwait(continueOnCapturedContext:false);
-
-        return msg.Replace("\n","");
+        string api_url = "https://jsonplaceholder.typicode.com/posts/";
+        var response = await client.GetAsync(api_url);
+        List<Post> posts = new();
+        if(response.IsSuccessStatusCode)
+        {
+            var jsonString = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            posts = JsonSerializer.Deserialize<List<Post>>(jsonString, options);
+            
+        }
+        return posts ?? new List<Post>();
     }
 
-    public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
+    public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest request, ILambdaContext context)
     {
-
-        var location = await GetCallingIP();
-        var body = new Dictionary<string, string>
+        if (request.HttpMethod.Equals("GET", StringComparison.CurrentCultureIgnoreCase))
         {
-            { "message", "hello world" },
-            { "location", location }
-        };
-
+            var posts = await GetPost();
+            return new APIGatewayProxyResponse
+            {
+                Body = JsonSerializer.Serialize(posts),
+                StatusCode = 200,
+                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+            };    
+        }
         return new APIGatewayProxyResponse
         {
-            Body = JsonSerializer.Serialize(body),
-            StatusCode = 200,
-            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+            StatusCode = 400,
+            Body = "Bad Request"
         };
     }
+}
+
+public class Post
+{
+    public int Id { get; set; }
+    public int UerId { get; set; }
+    public string Title { get; set; } = String.Empty;
+    public string Body { get; set; } = String.Empty;
 }
