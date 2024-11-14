@@ -29,3 +29,12 @@ warm_containers = "EAGER"
 
 [default.local_start_lambda.parameters]
 warm_containers = "EAGER"
+
+[dev.deploy.parameters]
+stack_name = "content-api-lambda-sam"
+resolve_s3 = true
+s3_prefix = "content-api-lambda-sam"
+resolve_image_repos = true
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
